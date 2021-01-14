@@ -1,0 +1,10 @@
+ROOT = "../input/"
+TRAIN_IMAGE_PATH = "../input/train_images/"
+N_FOLDS = 4
+SEED = 42
+TRAIN_BATCH_SIZE = 64
+VALID_BATCH_SIZE = 64
+NUM_WORKERS = 4
+LR = 3e-4
+NUM_EPOCHS = 10
+KERNEL_TYPE = 'resnet34'

@@ -1,10 +1,4 @@
-pandas
-kaggle
-jupyter
-scikit-learn
-timm
-albumentations 
-torchcontrib
-
-git+https://github.com/ildoonet/pytorch-gradual-warmup-lr.git
-git+https://github.com/vacancy/Synchronized-BatchNorm-PyTorch.git
+albumentations==0.5.2
+pretrainedmodels==0.7.4
+torch==1.7.0
+torchvision==0.8.1

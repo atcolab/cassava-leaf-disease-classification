@@ -1,85 +1,70 @@
 import torch
-from tqdm import tqdm
 import numpy as np
-import config
-from utils import rand_bbox
-from torch.cuda.amp import autocast, GradScaler
+from apex import amp
+from tqdm import tqdm
 
-def train_loop_fn(model, loader, optimizer, loss_func, device, epoch, scaler):
+def train_loop_fn(model, train_idx, loader, optimizer, loss_fn, device):
     model.train()
 
-    TRAIN_LOSS = []
+    avg_train_loss = 0.0
+    train_running_acc = 0.0
+    correct = 0.0
 
-    bar = tqdm(enumerate(loader), total=len(loader))
+    losses = []
+    accs = []
 
-    for step, (data, target) in bar:
+    for step, (data, target) in tqdm(enumerate(loader), total=len(loader)):
+
         data = data.to(device)
         target = target.to(device)
-        
-        with autocast():
-            
-            rand_p = np.random.rand()
 
-            if rand_p < 0.5:
-                lam = np.random.beta(1., 1.)
-                rand_index = torch.randperm(data.size()[0]).cuda()
-                target_a = target
-                target_b = target[rand_index]
-                bbx1, bby1, bbx2, bby2 = rand_bbox(data.size(), lam)
-                data[:, :, bbx1:bbx2, bby1:bby2] = data[rand_index, :, bbx1:bbx2, bby1:bby2]
-                lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (data.size()[-1] * data.size()[-2]))
-                outputs = model(data)
-                loss = loss_func(outputs, target_a) * lam + loss_func(outputs, target_b) * (1. - lam)
-            else:
-                outputs = model(data)
-                loss = loss_func(outputs, target)
+        optimizer.zero_grad()
+        outputs = model(data)
+        loss = loss_fn(outputs, target)
 
-            scaler.scale(loss).backward()
+        with amp.scale_loss(loss, optimizer) as scaled_loss:
+            scaled_loss.backward()
 
-            TRAIN_LOSS.append(loss.item())
-            smooth_loss = np.mean(TRAIN_LOSS[-30:])
-            bar.set_description(f'loss: {loss.item():.5f}, smth: {smooth_loss:.5f}')
+        avg_train_loss += loss.item() / len(loader)
+        optimizer.step()
 
-            if ((step + 1) % config.ACCUM_ITER == 0) or ((step + 1) == len(loader)):
-                scaler.step(optimizer)
-                scaler.update()
-                optimizer.zero_grad()
+        correct += (outputs.argmax(1) == target).sum().item()
+        train_running_acc = correct / len(train_idx)
 
+    losses.append(avg_train_loss)
+    accs.append(train_running_acc)
 
-        avg_train_loss = np.mean(TRAIN_LOSS)
-    
-    return avg_train_loss
+    return np.array(losses).mean(), np.array(accs).mean()
 
-
-def valid_loop_fn(model, loader, loss_func, device):
+def val_loop_fn(model, valid_idx, loader, optimizer, loss_fn, device):
     model.eval()
-
+    avg_val_loss = 0.0
+    val_running_acc = 0.0
     correct = 0.0
-    total_samples = 0.0
-
-    VAL_LOSS = []
-
-    bar = tqdm(enumerate(loader), total=len(loader))
+    val_losses = []
+    val_accs = []
 
     with torch.no_grad():
-        for step, (data, target) in bar:
 
-            data = data.to(device)
-            target = target.to(device)
-            
-            outputs = model(data)
+      for step, (data, target) in tqdm(enumerate(loader),total=len(loader)):
 
-            pred = outputs.max(1, keepdim=True)[1]
-            correct += pred.eq(target.view_as(pred)).sum().item()
-            total_samples += data.size()[0]
-            loss = loss_func(outputs, target)
+        data = data.to(device)
+        target = target.to(device)
 
-            VAL_LOSS.append(loss.item())
+        outputs = model(data)
+        loss = loss_fn(outputs, target.squeeze(-1))
+        avg_val_loss += loss.item() / len(loader) 
 
-            smooth_loss = np.mean(VAL_LOSS[-30:])
-            bar.set_description(f'loss: {loss.item():.5f}, smth: {smooth_loss:.5f}')
+        correct += (outputs.argmax(1) == target).sum().item()
+        val_running_acc = correct / len(valid_idx)
 
-    avg_valid_loss = np.mean(VAL_LOSS)
-    accuracy = 100.0 * correct / total_samples
+    val_losses.append(avg_val_loss)
+    val_accs.append(val_running_acc)
 
-    return avg_valid_loss, accuracy
+    return np.array(val_losses).mean(), np.array(val_accs).mean()
+
+
+
+
+
+

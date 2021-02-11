@@ -1,7 +1,7 @@
 import cv2
-import torch
 import numpy as np
-import pandas as pd
+import torch 
+import torch.nn as nn 
 from torch.utils.data import Dataset
 
 import config
@@ -17,7 +17,7 @@ class LeafDataset(Dataset):
 
     def __getitem__(self, index):
         fname = self.df['image_id'].values[index]
-        fpath = f'{config.TRAIN_IMAGE_PATH}{fname}'
+        fpath = f'{config.TRAIN_IMG_PATH}{fname}'
 
         image = cv2.imread(fpath, cv2.IMREAD_COLOR)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -27,9 +27,5 @@ class LeafDataset(Dataset):
             image = image['image']
 
         label = self.labels[index]
-
-        image = image.astype(np.float32)
-        image /= 255.0
-        image = image.transpose(2, 0, 1)
 
         return torch.tensor(image), torch.tensor(label)

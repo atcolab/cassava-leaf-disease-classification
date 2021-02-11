@@ -1,6 +1,6 @@
-TRAIN_CSV_PATH = '../input/train.csv'
-FOLDS_CSV_PATH = './folds.csv'
-TRAIN_IMG_PATH = '../input/train_images/'
+TRAIN_CSV_PATH = "../input/train.csv"
+FOLDS_CSV_PATH = "./folds.csv"
+TRAIN_IMG_PATH = "../input/train_images/"
 IMG_SIZE = 384
 TRAIN_BS = 16
 VALID_BS = 32
